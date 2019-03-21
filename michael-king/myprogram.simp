@@ -1,0 +1,169 @@
+<?php
+session_start();
+$product_ids = array();
+//session_destroy();
+
+//pre_r($_SESSION);
+
+function pre_r($array){
+	echo '<pre>';
+	print_r($array);
+	echo '</pre>';
+}
+
+$dbhost = "mysql-server-1.macs.hw.ac.uk";
+$dbuser = "cpgroup";
+$dbpass = "abccpgroup354";
+$dbname = "cpgroup";
+ 
+$conn = mysqli_connect($dbhost, $dbuser, $dbpass, $dbname);
+
+if ($conn->connection_error) {
+  die("Connection failed: " . $conn->connect_error); 
+  }
+
+
+?>
+    <!DOCTYPE html>
+    <html lang="en">
+
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+        <title>Waiter Page</title>
+        
+		<link href="css/bootstrap.min.css" rel="stylesheet">
+        <!--<link href="custom.css" rel="stylesheet"> -->
+
+
+    </head>
+
+    <body>
+
+        <div class="container">
+            <nav class="navbar navbar-default">
+                <div class="container-fluid">
+                    <div class="navbar-header">
+                        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+              <span class="sr-only">Toggle navigation</span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+            </button>
+                        <a class="navbar-brand" href="#">Logged in as: Tom</a>
+                    </div>
+                    <div id="navbar" class="navbar-collapse collapse">
+                        <ul class="nav navbar-nav navbar-right">
+                            <li><a href="http://www2.macs.hw.ac.uk/~dg17/Year3/GroupProject/waiterView.php"><span class="glyphicon glyphicon-remove"></span> Cancel Order</a></li>
+                            <li><a><span class="glyphicon glyphicon-ok"></span> Submit Order</a></li>
+                        </ul>
+                    </div>
+                    <!--/.nav-collapse -->
+                </div>
+                <!--/.container-fluid -->
+            </nav>
+            <?php
+
+$sql = 'SELECT DISTINCT Order_ID FROM Menu';
+$types = $conn->query($sql);
+
+$main = "Main";
+
+//$sql = "SELECT Name, Cost, Description, Order_ID FROM Menu WHERE Order_ID = '$main'";
+//$itemData = $conn->query($sql);
+    
+?>
+                <div class="jumbotron vertical-center">
+                    <div class="h-100 container">
+                        <!--H-100 is a bootstrap command, not working right now and I don't know why. It'll space the 9 elements out to fill the available space when it works. - Daniel  -->
+                        <div class="row active">
+                            <div class="col-xs-6">
+
+                                <div id="accordion">
+                                    <div class="card">
+                                        <?php foreach($types as $type){ ?>
+                                        <div class="card-header" id="headingOne">
+                                            <h5 class="mb-0">
+                                                <button class="btn btn-link" data-toggle="collapse" data-target=<?php echo "#collapse".$type[ 'Order_ID'];?> aria-expanded="true" aria-controls="collapseOne">
+                                                    <?php 
+                                                        echo $type['Order_ID'];
+                                                        $typeName = $type['Order_ID'];
+                                                    ?>
+                                                 </button>
+                                            </h5>
+                                        </div>
+
+                                        <div id=<?php echo "collapse".$type[ 'Order_ID'];?> class="collapse" aria-labelledby="headingOne" data-parent="#accordion">
+                                            <div class="card-body">
+                                                <?php  
+                                                    $sql = "SELECT * FROM Menu WHERE Order_ID = '$typeName'"; 
+                                                    $itemData = $conn->query($sql);
+                                                    foreach($itemData as $item){ 
+                                                ?>
+                                                <form method="post" action="waiterOrder.php?action=add&ID=<?php echo $item['ID']; ?>">
+                                                    <div class="card" style="width: 18rem;">
+                                                        <img class="card-img-top" src="..." alt="no img">
+                                                        <div class="card-body">
+                                                            <h5 class="card-text">
+                                                                <?php echo $item['Name'] ?>
+                                                            </h5>
+                                                            <p class="card-title">
+                                                                <?php echo $item['Description'] ?>
+                                                            </p>
+                                                            <p class="card-title">
+                                                                <?php echo "£".$item['Cost'] ?>
+                                                            </p>
+                                                            <input type="test" name="Quantity" class="form-control" value="1" />
+                                                            <input type="hidden" name="Name" value="<?php echo $item['Name']; ?>" />
+                                                            <input type="hidden" name="Cost" value="<?php echo $item['Cost']; ?>" />
+                                                            <input type="submit" style="margin-top:5px;" name="add_to_cart" class="btn btn-info" value="Add to Order"/>
+                                                        </div>
+                                                    </div>
+                                                </form>
+                                                <?php } ?>
+
+                                            </div>
+                                        </div>
+                                        <?php } ?>
+                                    </div>
+                                </div>
+                            </div>
+                            </div>
+                    </div>
+                </div>
+        </div>
+			
+        </div>
+        <!--/.container-close -->
+        <nav>
+			
+<script>
+$( document ).ready(function() {
+    $("form").submit(function(e) {
+        e.preventDefault(); // prevent page refresh
+
+        $.ajax({
+            type: "POST",
+            url: "waiterOrder.php",
+            data: $(this).serialize(), // serialize form data
+            success: function(data) {
+                // Success ...
+            },
+            error: function() {
+                // Error ...
+            }
+        });
+    });
+});
+</script>
+
+
+            <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+            <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+            <!-- Include all compiled plugins (below), or include individual files as needed -->
+            <script src="js/bootstrap.min.js"></script>
+    </body>
+
+    </html>

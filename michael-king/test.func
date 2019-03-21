@@ -1,0 +1,4 @@
+method main() vars inp, res
+begin
+	res:=plus(2,inp);
+endmethod;
