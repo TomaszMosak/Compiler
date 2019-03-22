@@ -1,6 +1,5 @@
 package func.compiler;
 
-
 import java.util.HashMap;
 
 import com.sun.javafx.collections.MappingChange.Map;
@@ -98,33 +97,40 @@ public class Compile implements ASTVisitor{
     	line ("addi $sp,$sp,4");
     }
     
-    private String notComp(Bop op) throws Exception{
-    	switch(op.op){
-    	       case LT: return "ge";
-    	       case LTE: return "gt";
-    	       case EQ: return "ne";
-    	       case NEQ: return "eq";
-    	       default: throw new Exception("Not an comparison operator" + op);
-    	     }
-    	   }
-    
 	public void visit(Program p) throws Exception{
 	      line (".data");
 	      code.append ("sinp:   .asciiz \"INPUT> \"\n");
-	      code.append(newline);
+	      //code.append(newline)
 	      line (".text");
-	
-	      for(Method mthd : p.method){
-	    	  visit(mthd);
+	      code.append("main:");
+	      
+	      for(Method m : p.method){
+	    	  m.accept(this);
 	      }
+	    
+	      line ("li $v0, 10"); 
+	      line ("syscall");	
 	}
 	
-	public void visit(Method mth) throws Exception {
-		
-	}
-	
-	public void visit(Arguments arguments) throws Exception {
-		
+	@Override
+	public void visit(Method mthd) throws Exception {
+		pushFrame();
+		if(mthd.statement != null){
+			for(Statement s : mthd.statement){
+				s.accept(this);
+			}
+		}
+		if(mthd.variables != null){
+			for(ID v : mthd.arguments.arguments){
+				frame.addVar(v.id);
+			}
+		}
+		if(mthd.arguments != null){
+			for(ID args : mthd.arguments.arguments){
+				args.accept(this);
+			}
+		}
+		popFrame();
 	}
 	
 	public void visit(writeStatement statement) throws Exception {
@@ -147,48 +153,42 @@ public class Compile implements ASTVisitor{
 	    line (String.format("move  %s,$v0",regname(reg)));	
 	}
 
-
-	private String compileCondExp (Cond exp) throws Exception{
+	private String compileCondExp (OpExp op) throws Exception{
 		RD=E1;
-		exp.Expressions.Expressions.get(0).accept(this);;
+		op.left.accept(this);
         codePush(E1);
 		RD=E2;
-		exp.Expressions.Expressions.get(1).accept(this);;
+        op.right.accept(this);
         codePop(E1);
-		return notComp(exp.op);
+		return notComp(op.op);
 	}
-	
-	public void visit(ifStatement statement) throws Exception{
+	public void visit(ifStatement p) throws Exception{
 		int ln = labno++;
 		// Visitor pattern not working properly here
-		Cond op = (Cond) statement.condition;
+		OpExp op = (OpExp) p.cond;
 		String oper = compileCondExp(op);
-		if(statement.hasElse()){
+		if(p.hasElse()){
 			line(String.format("b%s %s,%s,IFALSE%d\n",oper,regname(E1),regname(E2),ln));
-			for (Statement s : statement.cmd1){
-				s.accept(this);
-			}
+			p.cmd1.accept(this);
 			line(String.format("j IFEND%d",ln));
 			code.append(String.format("IFALSE%d:\n",ln));
-			for (Statement s : statement.cmd2){
-				s.accept(this);
-			}
+			p.cmd2.accept(this);
 		}else{
 			line(String.format("\tb%s %s,%s,IFEND%d\n",oper,regname(E1),regname(E2),ln));
-			((Bop) statement.cmd1).accept(this);
+			p.cmd1.accept(this);
 		}
 		code.append(String.format("IFEND%d:\n",ln));
 		
 	}
 
-	public void visit(whileStatement statement) throws Exception {
+	public void visit(whileStatement cmd) throws Exception {
 		int ln = labno++;
 		code.append(String.format("WLOOP%d:\n",ln));
 		// Visitor pattern not working properly here
-		Cond op = (Cond) statement.condition;
+		OpExp op = (OpExp) cmd.cond;
 		String oper = compileCondExp(op);
         line(String.format("b%s %s,%s,WEND%d",oper,regname(E1),regname(E2),ln));
-        ((Bop) statement.cmd).accept(this);
+        cmd.cmd.accept(this);
         line (String.format("j WLOOP%d",ln));
         code.append(String.format("WEND%d:\n",ln));
 	}
@@ -199,18 +199,32 @@ public class Compile implements ASTVisitor{
 		if (reg == -1)
 			throw new Exception("Assignment - Variable not present: " + statement.variable.id);
 		RD=reg;
-		statement.accept(this);		
+		statement.exp.accept(this);
+	}
+	
+	public void visit(negExp e) throws Exception {
+		RD = E1;
+		e.exp.accept(this);
+		line(String.format("sub 0, %s, %s", regname(E1), regname(RD)));
+	}
+	
+	public void visit(IDExp e) throws Exception {
+		line(String.format("move, %s, %s", regname(RD), regname(frame.findVar(e.id.id))));
+	}
+	
+	public void visit(IntExp e) throws Exception {
+		line(String.format("move, %s, %s", regname(RD), e.ind));
 	}
 
-	public void visit(Cond e) throws Exception {
+	public void visit(OpExp e) throws Exception {
 		int cur = RD;
 		RD=E1;
-		e.Expressions.Expressions.get(0).accept(this);
+		e.left.accept(this);
         codePush(E1);
 		RD=E2;
-		e.Expressions.Expressions.get(1).accept(this);
+        e.right.accept(this);
         codePop(E1);
-        line (String.format("%s %s,%s,%s", compileCondExp(e), regname(cur), regname(E1), regname(E2)));		
+        line (String.format("%s %s,%s,%s", compOp(e.op), regname(cur), regname(E1), regname(E2)));		
 	}
 
 	@Override
@@ -221,6 +235,12 @@ public class Compile implements ASTVisitor{
 
 	@Override
 	public void visit(Int ind) throws Exception {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void visit(Arguments arguments) throws Exception {
 		// TODO Auto-generated method stub
 		
 	}
@@ -254,5 +274,11 @@ public class Compile implements ASTVisitor{
 		// TODO Auto-generated method stub
 		
 	}
-	
+
+	@Override
+	public void visit(Cond Expressions) throws Exception {
+		// TODO Auto-generated method stub
+		
+	}
+
 }
